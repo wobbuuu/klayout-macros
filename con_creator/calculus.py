@@ -50,7 +50,7 @@ class Calculus:
         #benchmarking
         speedups.enable()
         if bench:
-            self.pr = cProfile.Profile()
+            self.pr = Profile()
             self.pr.enable()           
 
     def print_stats(self):
@@ -60,9 +60,9 @@ class Calculus:
         ps.print_stats()
         self.outlog.write(s.getvalue())   
     
-    def get_poly(self, fig, current, grid, dict_minmax):
+    def get_poly(self, fig, current, dbu, dict_minmax):
         fig = fig.to_simple_polygon()
-        fig = DSimplePolygon.from_ipoly(fig) * grid  # coordinates of polygons in microns (double)
+        fig = DSimplePolygon.from_ipoly(fig) * dbu  # coordinates of polygons in microns (double)
         set_x = set()
         set_y = set()
         points = []
@@ -83,7 +83,7 @@ class Calculus:
         layit = Application.instance().main_window().current_view().begin_layers()
         cell = Application.instance().main_window().current_view().active_cellview().cell
         ly = Application.instance().main_window().current_view().active_cellview().layout()
-        grid = Application.instance().main_window().grid_micron()          
+        dbu = ly.dbu          
         
         #Starting collecting data from layers
         self.outlog.write("Collecting data from layers:\n")    
@@ -97,7 +97,7 @@ class Calculus:
                 shape_iter = ly.begin_shapes(cell, lp.layer_index())
                 while (not shape_iter.at_end()):
                     shape = shape_iter.shape()
-                    poly = self.get_poly(shape.polygon.transformed(shape_iter.itrans()), current, grid, dict_minmax)
+                    poly = self.get_poly(shape.polygon.transformed(shape_iter.itrans()), current, dbu, dict_minmax)
                     if poly != None:
                         polygons.append(poly)
                         current += 1
