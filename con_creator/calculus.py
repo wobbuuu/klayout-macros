@@ -104,7 +104,12 @@ class Calculus:
                     shape_iter.next()
             layit.next()        
         self.timer.update()               
-        shapes_with_f, amount = self.polygon_division(polygons, dict_minmax)      
+        shapes_with_f, amount = self.polygon_division(polygons, dict_minmax)
+        for key, value in shapes_with_f.items():
+            print(key)
+            print(mapping(value[0]))
+            #for point in value[0].exterior.coords.xy:
+            #    print(point)    
         self.outlog.write(str(self.timer))    
         self.outlog.write("There were ", len(polygons), " polygons. Now there are ", amount, " polygons in ", len(shapes_with_f.keys()), " fields.\n")
         self.timer.update()        
@@ -213,8 +218,20 @@ class Calculus:
                 self.outlog.write("Coordinates of hull:", cords)
                 raise Exception
             cords = list(shape.exterior.coords.xy)
-            p0 = [cords[0][0], cords[1][0]]  #need 1 point of polygon to get field  
-            shapes_with_f[self.get_field(p0)].append(shape)
+            ps_for_f = []
+            for i in range(3):
+                ps_for_f.append([cords[0][i], cords[1][i]])  # need 3 point of polygon to get field
+            inside_p = [0, 0]
+            p_prev = ps_for_f[-1]
+            perim = 0
+            for p in ps_for_f:
+                side = ((p[0] - p_prev[0]) ** 2 + (p[1] - p_prev[1]) ** 2) ** 0.5
+                inside_p[0] += side * p_prev[0]
+                inside_p[1] += side * p_prev[1]
+                perim += side
+                p_prev = p
+            inside_p = [inside_p[0] / perim, inside_p[1] / perim] # incenter of triangle based on first 3 points of shape
+            shapes_with_f[self.get_field(inside_p)].append(shape)
         return shapes_with_f, amount
         
     def myround(self, num):
