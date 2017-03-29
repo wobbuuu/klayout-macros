@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="utf-8"?>
+<klayout-macro>
+ <description>Insert images to layout</description>
+ <version>0.1</version>
+ <category>pymacros</category>
+ <prolog/>
+ <epilog/>
+ <doc/>
+ <autorun>false</autorun>
+ <autorun-early>false</autorun-early>
+ <shortcut/>
+ <show-in-menu>true</show-in-menu>
+ <group-name/>
+ <menu-path>edit_menu.image_menu</menu-path>
+ <interpreter>python</interpreter>
+ <dsl-interpreter-name/>
+ <text>import importlib
+import configparser
+import os
+import pya
+import json
+
+from image_insert import image_insert
+importlib.reload(image_insert)
+from image_insert.image_insert import add_images
+
+
+class OutLog:
+    def __init__(self, edit, color=None):
+        self.edit = edit
+        self.color = color
+
+    def write(self, *args):
+        if self.color:
+            tc = self.edit.textColor()
+            self.edit.setTextColor(self.color)
+        for argv in args:
+            self.edit.moveCursor(pya.QTextCursor.End)
+            self.edit.insertPlainText(str(argv)) 
+        if self.color:
+            self.edit.setTextColor(tc)
+  		
+        
+class Gui:
+    def __init__(self):
+        # creation of form
+        directory = os.path.dirname(os.path.realpath(__file__))
+        ui_file = pya.QFile(os.path.join(directory, "dialog.ui"))
+        ui_file.open(pya.QIODevice.ReadOnly)
+        self.form = pya.QFormBuilder().load(ui_file, pya.Application.instance().main_window())
+        ui_file.close()
+
+        # loading defaults
+        config = configparser.ConfigParser()
+        config.read(os.path.join(directory, "defaults.ini"))
+        
+        # setting defaults
+        self.def_path = os.path.expanduser(config.get("General", "path"))
+        offset = json.loads(config.get("General", "offset"))
+        self.form.offset_x.value = offset[0]
+        self.form.offset_y.value = offset[1]
+        
+        macrostep = json.loads(config.get("General", "macrostep"))
+        self.form.macrostep_x.value = macrostep[0]
+        self.form.macrostep_y.value = macrostep[1]
+        
+        self.infield_shift = json.loads(config.get("General", "infield_shift"))
+        self.step = json.loads(config.get("General", "step"))
+        
+        self.form.multifields.checked = config.getboolean("General", "multifields")
+        self.step_multifield = json.loads(config.get("General", "step_multifield"))       
+        self.infield_shift_multifield_1 = json.loads(config.get("General", "infield_shift_multifield_1"))
+        self.infield_shift_multifield_2 = json.loads(config.get("General", "infield_shift_multifield_2"))        
+        
+        self.form.cross_search.value = config.getfloat("General", "cross_search")        
+        self.__multifields_clicked(self.form.multifields.checked)
+        
+        # setting event handlers 
+        self.form.browse_button.clicked(self.__browse_button_clicked)
+        self.form.clear_button.clicked(self.__clear_button_clicked)
+        self.form.insert_button.clicked(self.__insert_button_clicked)
+        self.form.multifields.clicked(self.__multifields_clicked)
+        
+        self.outlog = OutLog(self.form.textEdit)
+        self.form.insert_button.setEnabled(False)        
+        self.form.exec_()
+
+    def set_elements(self, flag):
+        '''
+        Enabling/disabling all elements of form excluding 'clear' button
+        flag = True means enabling
+        '''
+        self.form.filename_str.setEnabled(flag)
+        self.form.browse_button.setEnabled(flag)
+        self.form.macrostep.setEnabled(flag)
+        self.form.offset.setEnabled(flag)
+        self.form.step.setEnabled(flag)
+        self.form.multifields.setEnabled(flag)
+        self.form.insert_button.setEnabled(flag)
+        self.form.with_annotation.setEnabled(flag)
+        self.form.infield_shift.setEnabled(flag)
+        self.form.cross_search.setEnabled(flag)
+        if flag:
+            self.__multifields_clicked(self.form.multifields.checked)
+        else:
+            self.form.infield_shift_2.setEnabled(flag)            
+
+    def __clear_button_clicked(self, clicked):
+        self.form.textEdit.clear()
+    
+    def __browse_button_clicked(self, clicked):
+        self.dirname = pya.QFileDialog.getExistingDirectory(self.form, "Open Directory", self.def_path)
+        if self.dirname != None:
+            self.form.filename_str.setText(self.dirname)
+            self.form.insert_button.setEnabled(True)
+    
+    def __multifields_clicked(self, checked):
+        if checked:
+            self.form.step_x.value = self.step_multifield[0]
+            self.form.step_y.value = self.step_multifield[1]
+            self.form.infield_shift_x.value = self.infield_shift_multifield_1[0]
+            self.form.infield_shift_y.value = self.infield_shift_multifield_1[1]
+            self.form.infield_shift_2.setEnabled(True)
+            self.form.infield_shift_2_x.value = self.infield_shift_multifield_2[0]
+            self.form.infield_shift_2_y.value = self.infield_shift_multifield_2[1]
+        else:
+            self.form.step_x.value = self.step[0]
+            self.form.step_y.value = self.step[1]
+            self.form.infield_shift_x.value = self.infield_shift[0]
+            self.form.infield_shift_y.value = self.infield_shift[1]  
+            self.form.infield_shift_2.setEnabled(False)
+            
+    def __insert_button_clicked(self, clicked):
+        if pya.Application.instance().main_window().current_view() == None:
+            self.outlog.write("Please open .gds file.\n")
+            return
+            
+        # collecting parametrs of execution
+        dirname = self.form.filename_str.displayText        
+        offset = [self.form.offset_x.value, self.form.offset_y.value]
+        macrostep = [self.form.macrostep_x.value, self.form.macrostep_y.value]        
+        multifields = self.form.multifields.checked
+        step = [self.form.step_x.value, self.form.step_y.value]
+        infield_shift = [self.form.infield_shift_x.value, self.form.infield_shift_y.value]
+        infield_shift_2 = [self.form.infield_shift_2_x.value, self.form.infield_shift_2_y.value]
+        infield_shifts = [infield_shift, infield_shift_2]
+        with_annotation = self.form.multifields.checked
+        annotation = self.form.annotation.value  
+        cross_search = self.form.cross_search.value     
+        
+        self.set_elements(False)        
+        add_images(dirname, offset, macrostep, step, infield_shifts, annotation, with_annotation,\
+         multifields, cross_search, self.outlog, bench=False)
+        self.set_elements(True)
+
+
+gui_window = Gui()
+</text>
+</klayout-macro>
