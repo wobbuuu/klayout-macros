@@ -7,7 +7,7 @@ from cProfile import Profile
 from pstats import Stats
 from io import StringIO
 from pya import DSimplePolygon, Application, QCoreApplication
-from shapely.geometry import Polygon, LineString, mapping
+from shapely.geometry import Polygon, LineString, Point, mapping
 from shapely import speedups
 
 
@@ -32,7 +32,7 @@ class Timer:
 
 
 class Calculus:
-    def __init__(self, dirname, field, marks, visible, direction, pitch, dose, outlog,bench=False):
+    def __init__(self, dirname, field, marks, visible, direction, pitch, dose, outlog, field_layer, bench=False):
         self.dirname = dirname
         self.field = field
         self.marks = marks
@@ -47,6 +47,8 @@ class Calculus:
         self.squaredist = self.dist ** 2
         self.end_bytes = bytes([0xff, 0xff, 0x13, 0x00] + 34 * [0xcc])
         self.bench = bench
+        self.ownfields = []
+        self.field_layer = field_layer
         #benchmarking
         speedups.enable()
         if bench:
@@ -92,24 +94,24 @@ class Calculus:
         current = 0
         while not layit.at_end():
             lp = layit.current()
+            print(lp.layer_index())
+            info = ly.get_info(lp.layer_index())
             if ((lp.visible and self.visible) or not self.visible) and lp.valid:
-                self.outlog.write(ly.get_info(lp.layer_index()), "\n")
+                self.outlog.write(info, "\n")
                 shape_iter = ly.begin_shapes(cell, lp.layer_index())
                 while (not shape_iter.at_end()):
                     shape = shape_iter.shape()
                     poly = self.get_poly(shape.polygon.transformed(shape_iter.itrans()), current, dbu, dict_minmax)
-                    if poly != None:
+                    if poly != None  and (str(info) != self.field_layer):
                         polygons.append(poly)
+                        current += 1
+                    elif poly != None  and (str(info) == self.field_layer):
+                        self.ownfields.append(poly)
                         current += 1
                     shape_iter.next()
             layit.next()        
         self.timer.update()               
-        shapes_with_f, amount = self.polygon_division(polygons, dict_minmax)
-        for key, value in shapes_with_f.items():
-            print(key)
-            print(mapping(value[0]))
-            #for point in value[0].exterior.coords.xy:
-            #    print(point)    
+        shapes_with_f, amount = self.polygon_division(polygons, dict_minmax) 
         self.outlog.write(str(self.timer))    
         self.outlog.write("There were ", len(polygons), " polygons. Now there are ", amount, " polygons in ", len(shapes_with_f.keys()), " fields.\n")
         self.timer.update()        
@@ -124,8 +126,15 @@ class Calculus:
         return True
 
     def get_field(self, point):
-        return (self.field.center[0] + self.field.size * ((point[0]  - self.field.center[0] + self.field.size / 2) // self.field.size),\
-         self.field.center[1] + self.field.size * ((point[1]  - self.field.center[1] + self.field.size / 2) // self.field.size))
+        if self.field_layer == "":
+            return (self.field.center[0] + self.field.size * ((point[0]  - self.field.center[0] + self.field.size / 2) // self.field.size),\
+            self.field.center[1] + self.field.size * ((point[1]  - self.field.center[1] + self.field.size / 2) // self.field.size))
+        else:
+            for f in self.ownfields:
+                if f.intersects(Point(point[0], point[1])):
+                    return (f.centroid.x, f.centroid.y)
+            self.outlog.write("There is an object outside field", '\n')
+            return None
 
     def getpoint(self, shape):
         cords = list(shape.exterior.coords.xy)
@@ -158,19 +167,42 @@ class Calculus:
     def polygon_division(self, shapes, dict_minmax):    
         #firsly we have to divide all shapes into pieces if field net crosses shape
         sections = defaultdict(list)
+        last_index = 0
+        new_shapes = []
         for shape_index, shape in enumerate(shapes):
-            sections[shape_index] = []
-            minimx = dict_minmax[shape_index][0]
-            maximx = dict_minmax[shape_index][2]
-            minimy = dict_minmax[shape_index][1]
-            maximy = dict_minmax[shape_index][3]
-            fmin = self.get_field((minimx, minimy))
-            fmax = self.get_field((maximx, maximy))
-            for y in range(int((fmax[1] - fmin[1]) / self.field.size)):
-                sections[shape_index].append(LineString([(minimx - self.dist, (y + 0.5) * self.field.size + fmin[1]), (maximx + self.dist, (y + 0.5) * self.field.size + fmin[1])]))
-            for x in range(int((fmax[0] - fmin[0]) / self.field.size)):
-                sections[shape_index].append(LineString([((x + 0.5) * self.field.size + fmin[0], minimy - self.dist), ((x + 0.5) * self.field.size + fmin[0], maximy + self.dist)]))        
-        shapes = self.cut_by_edge(shapes, sections)
+            if self.field_layer == "":
+                sections[shape_index] = []
+                minimx = dict_minmax[shape_index][0]
+                maximx = dict_minmax[shape_index][2]
+                minimy = dict_minmax[shape_index][1]
+                maximy = dict_minmax[shape_index][3]
+                fmin = self.get_field((minimx, minimy))
+                fmax = self.get_field((maximx, maximy))
+                for y in range(int((fmax[1] - fmin[1]) / self.field.size)):
+                    sections[shape_index].append(LineString([(minimx - self.dist, (y + 0.5) * self.field.size + fmin[1]),\
+                     (maximx + self.dist, (y + 0.5) * self.field.size + fmin[1])]))
+                for x in range(int((fmax[0] - fmin[0]) / self.field.size)):
+                    sections[shape_index].append(LineString([((x + 0.5) * self.field.size + fmin[0], minimy - self.dist),\
+                     ((x + 0.5) * self.field.size + fmin[0], maximy + self.dist)]))        
+            else:
+                sec_set = []
+                k = False
+                for f in self.ownfields:
+                    if f.intersects(shape):
+                        bounds = f.bounds
+                        sec_set.append(LineString([(bounds[0], bounds[1]), (bounds[0], bounds[3])]))
+                        sec_set.append(LineString([(bounds[0], bounds[1]), (bounds[2], bounds[1])]))
+                        sec_set.append(LineString([(bounds[2], bounds[3]), (bounds[0], bounds[3])]))
+                        sec_set.append(LineString([(bounds[2], bounds[3]), (bounds[2], bounds[1])]))
+                        k = True
+                if k:
+                    new_shapes.append(shape)
+                    sections[last_index] = sec_set
+                    last_index += 1
+
+        if self.field_layer == "":
+            new_shapes = shapes
+        shapes = self.cut_by_edge(new_shapes, sections)
         
         #secondly new shapes have to be divided into trapezoids parallelograms and triangles
         dict_x = dict()

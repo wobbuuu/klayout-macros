@@ -83,7 +83,7 @@ class Gui:
         self.outlog = OutLog(self.form.textEdit)
         self.form.convert_button.setEnabled(False)
         self.form.pitch.setEnabled(False)
-        self.form.along_y_button.setEnabled(False)
+        #self.form.along_y_button.setEnabled(False)
         
         self.form.exec_()
 
@@ -98,11 +98,12 @@ class Gui:
         self.form.center_groupbox.setEnabled(flag)
         self.form.reg_flag.setEnabled(flag)
         self.form.visible_flag.setEnabled(flag)
-        self.form.along_x_button.setEnabled(flag)
+        #self.form.along_x_button.setEnabled(flag)
         #self.form.along_y_button.setEnabled(flag)
         self.form.dose.setEnabled(flag)
         #self.form.pitch.setEnabled(flag)        
         self.form.convert_button.setEnabled(flag)
+        self.form.field_layer_box.setEnabled(flag)
     
     def __clear_button_clicked(self, clicked):
         self.form.textEdit.clear()
@@ -118,10 +119,10 @@ class Gui:
             self.outlog.write("Please open .gds file.\n")
             return
         # collecting parametrs of execution
-        if self.form.along_x_button.checked:
-            direction = 'x'
-        else:
-            direction = 'y'
+        #if self.form.along_x_button.checked:
+        direction = 'x'
+        #else:
+        #    direction = 'y'
         f_size = int(self.form.field_size.currentText)
         f_dots = int(self.form.field_dots.currentText)
         f_center = [self.form.field_center_x.value, self.form.field_center_y.value]
@@ -144,8 +145,11 @@ class Gui:
             self.outlog.write("Registration marks: ", marks, " mm.\n")
         else:
             self.outlog.write("No registration marks.\n")
-        
-        self.worker = Calculus(dirname, field, marks, visible, direction, pitch, dose, self.outlog)
+        if self.form.field_layer_box.checked:
+            field_layer = self.form.field_layer.text
+        else:
+            field_layer = ""
+        self.worker = Calculus(dirname, field, marks, visible, direction, pitch, dose, self.outlog, field_layer)
         self.worker.start()
         self.set_elements(True)
 

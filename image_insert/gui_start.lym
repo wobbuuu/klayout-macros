@@ -144,7 +144,7 @@ class Gui:
         infield_shift = [self.form.infield_shift_x.value, self.form.infield_shift_y.value]
         infield_shift_2 = [self.form.infield_shift_2_x.value, self.form.infield_shift_2_y.value]
         infield_shifts = [infield_shift, infield_shift_2]
-        with_annotation = self.form.multifields.checked
+        with_annotation = self.form.with_annotation.checked
         annotation = self.form.annotation.value  
         cross_search = self.form.cross_search.value     
         

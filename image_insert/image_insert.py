@@ -6,6 +6,7 @@ import pstats
 import io
 import time
 from PIL import Image
+from collections import defaultdict
 
 #file name should be delimitered with '_' 
 #example Sample_Nice_f3_01_25
@@ -41,7 +42,7 @@ def delete_image(path, need_delete):
 def find_cross(pic, width, height, pix1, pix2):
     '''
     pix1, pix2 - tuples indicate region of pic in which
-    cross shpuld be found
+    cross should be found
     pix1 < pix2 (both coords)
     '''
     matrix = np.matrix([[pic.get_pixel(i,j) for i in range(pix1[0], pix2[0])] for j in range(pix1[1], pix2[1])])        
@@ -53,9 +54,9 @@ def find_cross(pic, width, height, pix1, pix2):
     x = (max(start, key=start.count) + max(end, key=end.count) - width) / 2 + pix1[0] + 1
     start = []
     end = []
-    for coulomn in (matrix[1:] - matrix[:-1]).T:
-        start.append(np.argmax(coulomn))
-        end.append(np.argmin(coulomn)) 
+    for column in (matrix[1:] - matrix[:-1]).T:
+        start.append(np.argmax(column))
+        end.append(np.argmin(column))
     y = (max(start, key=start.count) + max(end, key=end.count) - height) / 2 + pix1[1] + 1
     return pya.DPoint(x,y) 
 
@@ -111,13 +112,16 @@ def add_images(dirname, offset, macrostep, step, infield_shifts, annotation, wit
             name = ".".join(parts[0:-1]).split('_')
             need_delete = False
             if parts[-1] in need_convert:
-                im = Image.open(path)        
-                path = path[: - (len(parts[-1]) + 1)] + ".png"
+                im = Image.open(path)
+                dire = os.path.join(path[: - (len(i) + 1)], "inserted")
+                if not os.path.exists(dire):
+                    os.makedirs(dire)
+                path = os.path.join(dire, ".".join(parts[0:-1]) + ".png")
                 im.save(path)
                 need_delete = True
             try:
                 if len(name) > 3 and not multifields:
-                    if name[-3][:-1] != "f" and name[-3][:-1] != "field":
+                    if name[-3][:-1] != "f" and name[-3][:-1] != "F" and name[-3][:-1] != "field":
                         outlog.write("Supposedly auxillary image. Image ", i, " was not inserted.\n")
                         delete_image(path, need_delete)
                         continue 
@@ -125,7 +129,7 @@ def add_images(dirname, offset, macrostep, step, infield_shifts, annotation, wit
                     shift = macrostep * np.array([(field - 1) % 2, (field - 1) // 2])
                     infield_shift = infield_shift_1
                 elif len(name) > 4 and multifields:
-                    if name[-4][:-1] != "f" and name[-4][:-1] != "field":
+                    if name[-4][:-1] != "f" and name[-4][:-1] != "F" and name[-4][:-1] != "field":
                         outlog.write("Supposedly auxillary image. Image ", i, " was not inserted.\n")
                         delete_image(path, need_delete)
                         continue  
@@ -149,7 +153,7 @@ def add_images(dirname, offset, macrostep, step, infield_shifts, annotation, wit
                 addpic(path, p1, p2, cross_search, with_annotation, annotation)
             except:
                 outlog.write("Exception caught. Image ", i, " was not inserted.\n") 
-            delete_image(path, need_delete)     
+            #delete_image(path, need_delete)     
     
     if bench:
         pr.disable()
