@@ -133,7 +133,7 @@ class Calculus:
             for f in self.ownfields:
                 if f.intersects(Point(point[0], point[1])):
                     return (f.centroid.x, f.centroid.y)
-            self.outlog.write("There is an object outside field", '\n')
+            self.outlog.write("There is a part of object outside field.", '\n')
             return None
 
     def getpoint(self, shape):
@@ -264,6 +264,9 @@ class Calculus:
                 p_prev = p
             inside_p = [inside_p[0] / perim, inside_p[1] / perim] # incenter of triangle based on first 3 points of shape
             shapes_with_f[self.get_field(inside_p)].append(shape)
+        if None in shapes_with_f.keys():
+            nones = shapes_with_f.pop(None)
+            amount -= len(nones)
         return shapes_with_f, amount
         
     def myround(self, num):
