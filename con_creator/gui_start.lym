@@ -135,6 +135,8 @@ class Gui:
         if reg_marks:
             marks = [(self.form.mark1_x.value / 1000, self.form.mark1_y.value / 1000),\
              (self.form.mark2_x.value / 1000, self.form.mark2_y.value / 1000)]
+            if marks[0][1] &gt; marks[1][1] or (marks[0][0] &gt; marks[1][0] and marks[0][1] == marks[1][1]):
+                marks[0], marks[1] = marks[1], marks[0]
         else:
             marks = None
         
