@@ -157,7 +157,7 @@ class Calculus:
                         if new_polygons.geom_type != "Polygon":
                             new_shapes.extend(new_polygons)
                         else:
-                            new_shapes.append(shape)
+                            new_shapes.append(new_polygons)
                     shapes_iter = new_shapes
                 out.extend(new_shapes)
             else:
