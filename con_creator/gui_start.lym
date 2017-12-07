@@ -130,6 +130,7 @@ class Gui:
         dose = self.form.dose.value
         pitch = self.form.pitch.value
         dirname = self.form.filename_str.displayText
+        
         visible = self.form.visible_flag.checked
         reg_marks = self.form.reg_flag.checked
         if reg_marks:
@@ -151,7 +152,8 @@ class Gui:
             field_layer = self.form.field_layer.text
         else:
             field_layer = ""
-        self.worker = Calculus(dirname, field, marks, visible, direction, pitch, dose, self.outlog, field_layer)
+        merge = self.form.merge_flag.checked
+        self.worker = Calculus(dirname, field, marks, visible, direction, pitch, dose, self.outlog, field_layer, merge)
         self.worker.start()
         self.set_elements(True)
 

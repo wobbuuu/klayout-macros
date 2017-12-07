@@ -6,10 +6,7 @@ from collections import defaultdict
 from cProfile import Profile
 from pstats import Stats
 from io import StringIO
-from pya import DSimplePolygon, Application, QCoreApplication
-from shapely.geometry import Polygon, LineString, Point, mapping
-from shapely import speedups
-
+import pya
 
 class Timer:
     def __init__(self):
@@ -32,7 +29,7 @@ class Timer:
 
 
 class Calculus:
-    def __init__(self, dirname, field, marks, visible, direction, pitch, dose, outlog, field_layer, bench=False):
+    def __init__(self, dirname, field, marks, visible, direction, pitch, dose, outlog, field_layer, merge, bench=False):
         self.dirname = dirname
         self.field = field
         self.marks = marks
@@ -49,6 +46,7 @@ class Calculus:
         self.bench = bench
         self.ownfields = []
         self.field_layer = field_layer
+        self.merge = merge
         #benchmarking
         speedups.enable()
         if bench:
@@ -61,57 +59,41 @@ class Calculus:
         ps = Stats(self.pr, stream=s).sort_stats(sortby)
         ps.print_stats()
         self.outlog.write(s.getvalue())   
-    
-    def get_poly(self, fig, current, dbu, dict_minmax):
-        fig = fig.to_simple_polygon()
-        fig = DSimplePolygon.from_ipoly(fig) * dbu  # coordinates of polygons in microns (double)
-        set_x = set()
-        set_y = set()
-        points = []
-        for p in fig.each_point():
-            points.append((p.x, p.y))
-            set_x.update([p.x])
-            set_y.update([p.y])
-        if len(set_x) < 2 and len(set_y) < 2:
-            self.outlog.write("Not a polygon, skipping.\n")
-            return None
-        dict_minmax[current] = (min(set_x), min(set_y), max(set_x), max(set_y))
-        poly = Polygon(points)
-        if not poly.is_valid:
-            poly = poly.buffer(0)
-        return poly
            
     def start(self):    
-        layit = Application.instance().main_window().current_view().begin_layers()
-        cell = Application.instance().main_window().current_view().active_cellview().cell
-        ly = Application.instance().main_window().current_view().active_cellview().layout()
-        dbu = ly.dbu          
-        
+        layit = pya.Application.instance().main_window().current_view().begin_layers()
+        cell = pya.Application.instance().main_window().current_view().active_cellview().cell
+        ly = pya.Application.instance().main_window().current_view().active_cellview().layout()
+        self.dbu = ly.dbu          
+        self.field.size = int(self.field.size / self.dbu)
+        self.field.center[0] = int(self.field.center[0] / self.dbu)
+        self.field.center[1] = int(self.field.center[1] / self.dbu)
         #Starting collecting data from layers
-        self.outlog.write("Collecting data from layers:\n")    
-        dict_minmax = dict()    
-        polygons = []        
-        current = 0
+        self.outlog.write("Collecting data from layers:\n")   
+        polygons = []    
         while not layit.at_end():
             lp = layit.current()
-            print(lp.layer_index())
             info = ly.get_info(lp.layer_index())
             if ((lp.visible and self.visible) or not self.visible) and lp.valid:
                 self.outlog.write(info, "\n")
                 shape_iter = ly.begin_shapes(cell, lp.layer_index())
                 while (not shape_iter.at_end()):
                     shape = shape_iter.shape()
-                    poly = self.get_poly(shape.polygon.transformed(shape_iter.itrans()), current, dbu, dict_minmax)
-                    if poly != None  and (str(info) != self.field_layer):
+                    if not shape.is_polygon:
+                        continue
+                    poly = shape.polygon.transformed(shape_iter.itrans())
+                    if str(info) != self.field_layer:
                         polygons.append(poly)
-                        current += 1
-                    elif poly != None  and (str(info) == self.field_layer):
-                        self.ownfields.append(poly)
-                        current += 1
+                    elif str(info) == self.field_layer:
+                        if not poly.is_box():
+                            self.outlog.write("There is a non-box shape on field layer.\n")
+                            continue    
+                        self.ownfields.append(poly.bbox())
                     shape_iter.next()
-            layit.next()        
+            layit.next()
+                    
         self.timer.update()               
-        shapes_with_f, amount = self.polygon_division(polygons, dict_minmax) 
+        shapes_with_f, amount = self.polygon_division(polygons, cell) 
         self.outlog.write(str(self.timer))    
         self.outlog.write("There were ", len(polygons), " polygons. Now there are ", amount, " polygons in ", len(shapes_with_f.keys()), " fields.\n")
         self.timer.update()        
@@ -125,186 +107,82 @@ class Calculus:
             self.print_stats(pr)
         return True
 
-    def get_field(self, point):
+    def get_fields(self, shape):
+        # returns field (pya.Box) where point is located
+        
+        minimx = int(self.field.center[0] + self.field.size * ((shape.bbox().left - self.field.center[0]) // self.field.size + 0.5))
+        maximx = int(self.field.center[0] + self.field.size * ((shape.bbox().right - self.field.center[0]) // self.field.size + 0.5))
+        minimy = int(self.field.center[1] + self.field.size * ((shape.bbox().bottom - self.field.center[1]) // self.field.size + 0.5))
+        maximy = int(self.field.center[1] + self.field.size * ((shape.bbox().top - self.field.center[1]) // self.field.size + 0.5))
+        fields = []
+        for x in range(minimx, maximx + 1, self.field.size):
+            for y in range(minimy, maximy + 1, self.field.size):
+                fields.append(pya.Box(x, y, x + self.field.size, y + self.field.size))
+        return fields
+
+    def polygon_division(self, shapes, cell):    
+        #firsly we have to divide all shapes into pieces where field boarder crosses shape
+        shapes_fielded = defaultdict(list)
+        sections = []
         if self.field_layer == "":
-            return (self.field.center[0] + self.field.size * ((point[0]  - self.field.center[0] + self.field.size / 2) // self.field.size),\
-            self.field.center[1] + self.field.size * ((point[1]  - self.field.center[1] + self.field.size / 2) // self.field.size))
+            new_sections = []
+            for shape in shapes:
+                sections.extend(self.get_fields(shape))    
+            for sec in sections:
+                if not sec in new_sections:
+                    new_sections.append(sec)
+            sections = new_sections     
         else:
-            for f in self.ownfields:
-                if f.intersects(Point(point[0], point[1])):
-                    return (f.centroid.x, f.centroid.y)
-            self.outlog.write("There is a part of object outside field.", '\n')
-            return None
-
-    def getpoint(self, shape):
-        cords = list(shape.exterior.coords.xy)
-        p0 = [cords[0][0], cords[1][0]]
-        for p in cords[1:]:
-            if p[0] != p0[0] and p[1] != p0[1]:
-                return ((p0[0] + p[0]) / 2, (p0[1] + p[1]) / 2)                           
-                    
-    def cut_by_edge(self, shapes, sections): 
-        out = [] 
-        for shape_index, sectiones in sections.items():        
-            shapes_iter = [shapes[shape_index]]
-            if sectiones != []:
-                for section in sectiones:
-                    self.timer.update()
-                    new_shapes = []            
-                    for shape in shapes_iter:
-                        section_pol = section.buffer(1e-8)
-                        new_polygons = shape.difference(section_pol)
-                        if new_polygons.geom_type != "Polygon":
-                            new_shapes.extend(new_polygons)
-                        else:
-                            new_shapes.append(new_polygons)
-                    shapes_iter = new_shapes
-                out.extend(new_shapes)
+            sections = self.ownfields
+        
+        new_shapes = defaultdict(list)
+        for sec in sections:
+            if self.merge: 
+                shapes_fielded[sec].extend(pya.EdgeProcessor().boolean_p2p(shapes, [sec], pya.EdgeProcessor.ModeAnd, True, True))
             else:
-                out.append(shapes[shape_index])         
-        return out
-
-    def polygon_division(self, shapes, dict_minmax):    
-        #firsly we have to divide all shapes into pieces if field net crosses shape
-        sections = defaultdict(list)
-        last_index = 0
-        new_shapes = []
-        for shape_index, shape in enumerate(shapes):
-            if self.field_layer == "":
-                sections[shape_index] = []
-                minimx = dict_minmax[shape_index][0]
-                maximx = dict_minmax[shape_index][2]
-                minimy = dict_minmax[shape_index][1]
-                maximy = dict_minmax[shape_index][3]
-                fmin = self.get_field((minimx, minimy))
-                fmax = self.get_field((maximx, maximy))
-                for y in range(int((fmax[1] - fmin[1]) / self.field.size)):
-                    sections[shape_index].append(LineString([(minimx - self.dist, (y + 0.5) * self.field.size + fmin[1]),\
-                     (maximx + self.dist, (y + 0.5) * self.field.size + fmin[1])]))
-                for x in range(int((fmax[0] - fmin[0]) / self.field.size)):
-                    sections[shape_index].append(LineString([((x + 0.5) * self.field.size + fmin[0], minimy - self.dist),\
-                     ((x + 0.5) * self.field.size + fmin[0], maximy + self.dist)]))        
-            else:
-                sec_set = []
-                k = False
-                for f in self.ownfields:
-                    if f.intersects(shape):
-                        bounds = f.bounds
-                        sec_set.append(LineString([(bounds[0], bounds[1]), (bounds[0], bounds[3])]))
-                        sec_set.append(LineString([(bounds[0], bounds[1]), (bounds[2], bounds[1])]))
-                        sec_set.append(LineString([(bounds[2], bounds[3]), (bounds[0], bounds[3])]))
-                        sec_set.append(LineString([(bounds[2], bounds[3]), (bounds[2], bounds[1])]))
-                        k = True
-                if k:
-                    new_shapes.append(shape)
-                    sections[last_index] = sec_set
-                    last_index += 1
-
-        if self.field_layer == "":
-            new_shapes = shapes
-        shapes = self.cut_by_edge(new_shapes, sections)
+                for shape in shapes:
+                    shapes_fielded[sec].extend(pya.EdgeProcessor().boolean_p2p([shape], [sec], pya.EdgeProcessor.ModeAnd, True, True))
+            if shapes_fielded[sec] != []:
+                new_shapes[sec] = shapes_fielded[sec]
+        shapes_fielded = new_shapes
         
         #secondly new shapes have to be divided into trapezoids parallelograms and triangles
-        dict_x = dict()
-        dict_y = dict()
-        dict_minmax = dict() 
-        for i,shape in enumerate(shapes):
-            set_x = set()
-            set_y = set() 
-            #dividing figure by horisontal or vertical lines made in vertexes' y positions
-            for countour in mapping(shape)['coordinates']:
-                for p in countour:
-                    set_x.update([p[0]])
-                    set_y.update([p[1]])
-            dict_minmax[i] = (min(set_x), min(set_y), max(set_x), max(set_y))
-            dict_x[i] = set_x - set([min(set_x), max(set_x)])
-            dict_y[i] = set_y - set([min(set_y), max(set_y)])    
+        amount = 0
+        for field in shapes_fielded.keys():
+            trs = []
+            for poly in shapes_fielded[field]:
+                trs.extend(poly.decompose_trapezoids(pya.Polygon.TD_htrapezoids))
+            shapes_fielded[field] = trs
+            amount += len(trs)
         
-        sections = defaultdict(list)
-        if self.direction == 'x':
-            for shape_index, set_y in dict_y.items():
-                minimx = dict_minmax[shape_index][0]
-                maximx = dict_minmax[shape_index][2]
-                for y in set_y:
-                    linx = LineString([(minimx - self.dist, y), (maximx + self.dist, y)])
-                    sections[shape_index].append(linx)
-                if not set_y:
-                    sections[shape_index] = []
-        elif self.direction == 'y':
-            for shape_index, set_x in dict_x.items():
-                minimy = dict_minmax[shape_index][1]
-                maximy = dict_minmax[shape_index][3]
-                for x in set_x:
-                    liny = LineString([(x, minimy - self.dist), (x, maximy + self.dist)])
-                    sections[shape_index].append(liny)
-                if not set_x:
-                    sections[shape_index] = []
-        shapes = self.cut_by_edge(shapes, sections)
-        
-        #finally we need to refer each shape to corresponding field
-        shapes_with_f = defaultdict(list)
-        amount = len(shapes)
-        for shape in shapes:
-            if len(shape.interiors) != 0:
-                self.outlog.write("Polygon with hole eventiolly created, creation stopped. This is bug.")
-                self.outlog.write("Coordinates of hull:", cords)
-                raise Exception
-            cords = list(shape.exterior.coords.xy)
-            ps_for_f = []
-            for i in range(3):
-                ps_for_f.append([cords[0][i], cords[1][i]])  # need 3 point of polygon to get field
-            inside_p = [0, 0]
-            p_prev = ps_for_f[-1]
-            perim = 0
-            for p in ps_for_f:
-                side = ((p[0] - p_prev[0]) ** 2 + (p[1] - p_prev[1]) ** 2) ** 0.5
-                inside_p[0] += side * p_prev[0]
-                inside_p[1] += side * p_prev[1]
-                perim += side
-                p_prev = p
-            inside_p = [inside_p[0] / perim, inside_p[1] / perim] # incenter of triangle based on first 3 points of shape
-            shapes_with_f[self.get_field(inside_p)].append(shape)
-        if None in shapes_with_f.keys():
-            nones = shapes_with_f.pop(None)
-            amount -= len(nones)
-        return shapes_with_f, amount
-        
-    def myround(self, num):
-        if num < 0.5:
-            return 0
-        string = str(num)
-        a = string.split('.')
-        if a[1] != "":
-            if a[1][0] > '4':
-                return int(a[0]) + 1
-        return int(a[0])
-
+            #for i in range(len(trs)):
+            #    cell.shapes(3).insert(trs[i])
+        return shapes_fielded, amount
+            
+    
     def signed_area(self, points):
         p1 = points[-1]
         area = 0 
         for p2 in points:
             area += (p2[0] - p1[0]) * (p2[1] + p1[1])
             p1 = p2
-        return area            
-            
+        return area  
+               
+    
     def get_str_bin(self, shape, field):    
         coef = self.field.dots / self.field.size
-        x,y = shape.exterior.coords.xy
         points = []
-        for i,p in enumerate(zip(x,y)):
-            xcord = self.myround((round(p[0], 3) - field[0] + self.field.size / 2) * coef)
-            ycord = self.myround((field[1] + self.field.size / 2 - round(p[1],3)) * coef)
-            point = (xcord, ycord)
-            if i == 0:
-                points.append(point)
-            elif point != points[-1]:
-                points.append(point)
+        for p in shape.each_point():
+            xcord = int((p.x - field.left) * coef)
+            ycord = int((field.top - p.y) * coef)
+            points.append((xcord, ycord))
+        points.append(points[0])
         area = self.signed_area(points)
         if len(points) < 4:
-            self.outlog.write("Polygon collapsed by amount of points. Points: ", '[' + ', '.join('(%.3f, %.3f)' % (v[0], v[1]) for v in zip(x,y)) + ']\n')
+            self.outlog.write("Polygon collapsed by amount of points. Points: ", '[' + ', '.join('(%.3f, %.3f)' % (v.x * self.dbu, v.y * self.dbu) for v in shape.each_point()) + ']\n')
             return None, None, None
         elif area == 0:
-            self.outlog.write("Polygon collapsed by zero area. Points: ", '[' + ', '.join('(%.3f, %.3f)' % (v[0], v[1]) for v in zip(x,y)) + ']\n')
+            self.outlog.write("Polygon collapsed by zero area. Points: ", '[' + ', '.join('(%.3f, %.3f)' % (v.x * self.dbu, v.y * self.dbu) for v in shape.each_point()) + ']\n')
             return None, None, None
         min_index, min_value = min(enumerate(points), key=lambda p: (p[1][1], p[1][0]))       
         points = points[min_index:] + points[1:min_index + 1]
@@ -329,7 +207,7 @@ class Calculus:
             return None, None, None
         outbinary[6] += 1
         outbinary[4] = self.pitch  #maybe pitch
-        outbinary[7] = self.myround(self.dose * 100)  #dose in us
+        outbinary[7] = int(self.dose * 100)  #dose in us
         s = Struct('< 3i 3f 2i')
         packed_data = s.pack(*outbinary)        
         poly_type = "DWSL"
@@ -357,15 +235,17 @@ class Calculus:
         filename = split(self.dirname)[1] + ".con"
         fcon = open(join(self.dirname, filename), 'w')
         fcon.write("/*--- " +  filename + " ---*/\n")
-        cz = "CZ" + str(self.field.size / 1000) + "," + str(self.field.dots)
+        cz = "CZ" + str(self.field.size * self.dbu / 1000) + "," + str(self.field.dots)
         fcon.write(cz + ";\n")
         if self.marks != None:
             fcon.write("R2 " + str(self.marks[0][0]) + "," + str(self.marks[0][1]) + "; "+ str(self.marks[1][0]) + ","+ str(self.marks[1][1]) + ";\n")
-        fields = sorted(shapes_with_f.keys(), key=lambda f: (f[1], f[0]))
+        fields = sorted(shapes_with_f.keys(), key=lambda f: (f.bottom, f.left))
         fname = "field"
         for i,f in enumerate(fields):
-            fcon.write("PC" + fname + "_" + str(i + 1) + ";\n" + str(f[0] / 1000) + "," + str(f[1] / 1000) + ";\n") 
-            fcon.write("PP" + fname + "_" + str(i + 1) + ";\n" + str(f[0] / 1000) + "," + str(f[1] / 1000) + ";\n")
+            fcon.write("PC" + fname + "_" + str(i + 1) + ";\n" + str((f.left + f.right) / 2 * self.dbu / 1000) + "," + \
+            str((f.top + f.bottom) / 2 * self.dbu / 1000) + ";\n") 
+            fcon.write("PP" + fname + "_" + str(i + 1) + ";\n" + str((f.left + f.right) / 2 * self.dbu / 1000) + "," + \
+            str((f.top + f.bottom) / 2 * self.dbu / 1000) + ";\n")
             
             fccc_name = fname + "_" + str(i + 1) + ".ccc"
             fccc = open(join(self.dirname, fccc_name), 'w')

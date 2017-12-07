@@ -176,13 +176,13 @@
     </item>
    </layout>
   </widget>
-  <widget class="QWidget" name="">
+  <widget class="QWidget" name="layoutWidget">
    <property name="geometry">
     <rect>
      <x>362</x>
-     <y>202</y>
+     <y>220</y>
      <width>130</width>
-     <height>59</height>
+     <height>51</height>
     </rect>
    </property>
    <layout class="QHBoxLayout" name="horizontalLayout_5" stretch="0,0,0">
@@ -370,7 +370,7 @@
    <property name="geometry">
     <rect>
      <x>362</x>
-     <y>122</y>
+     <y>140</y>
      <width>159</width>
      <height>80</height>
     </rect>
@@ -387,10 +387,10 @@
    <widget class="QWidget" name="layoutWidget">
     <property name="geometry">
      <rect>
-      <x>10</x>
+      <x>4</x>
       <y>22</y>
-      <width>145</width>
-      <height>55</height>
+      <width>151</width>
+      <height>51</height>
      </rect>
     </property>
     <layout class="QVBoxLayout" name="verticalLayout_15">
@@ -428,7 +428,7 @@
     </layout>
    </widget>
   </widget>
-  <widget class="QWidget" name="">
+  <widget class="QWidget" name="layoutWidget">
    <property name="geometry">
     <rect>
      <x>17</x>
@@ -829,7 +829,7 @@
     </item>
    </layout>
   </widget>
-  <widget class="QWidget" name="">
+  <widget class="QWidget" name="layoutWidget">
    <property name="geometry">
     <rect>
      <x>186</x>
@@ -1247,7 +1247,7 @@
    <property name="geometry">
     <rect>
      <x>362</x>
-     <y>97</y>
+     <y>120</y>
      <width>107</width>
      <height>25</height>
     </rect>
@@ -1270,18 +1270,39 @@
     <bool>false</bool>
    </property>
   </widget>
+  <widget class="QCheckBox" name="merge_flag">
+   <property name="geometry">
+    <rect>
+     <x>362</x>
+     <y>97</y>
+     <width>144</width>
+     <height>25</height>
+    </rect>
+   </property>
+   <property name="font">
+    <font>
+     <pointsize>11</pointsize>
+    </font>
+   </property>
+   <property name="text">
+    <string>Merge objects</string>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+  </widget>
+  <zorder>along_x_button</zorder>
   <zorder>layoutWidget</zorder>
   <zorder>layoutWidget</zorder>
   <zorder>textEdit</zorder>
   <zorder>clear_button</zorder>
   <zorder>convert_button</zorder>
   <zorder>label_19</zorder>
-  <zorder></zorder>
-  <zorder>label_17</zorder>
-  <zorder></zorder>
-  <zorder></zorder>
+  <zorder>layoutWidget</zorder>
+  <zorder>layoutWidget</zorder>
   <zorder>field_layer_box</zorder>
-  <zorder></zorder>
+  <zorder>visible_flag</zorder>
+  <zorder>merge_flag</zorder>
  </widget>
  <resources/>
  <connections/>
