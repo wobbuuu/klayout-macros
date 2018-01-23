@@ -17,7 +17,7 @@ class Timer:
     def update(self):
         self.current = time()
         if self.current > self.last_update + self.period:
-            QCoreApplication.processEvents()         
+            pya.QCoreApplication.processEvents()         
             self.last_update = self.current           
 	
     def refresh(self):
@@ -48,7 +48,6 @@ class Calculus:
         self.field_layer = field_layer
         self.merge = merge
         #benchmarking
-        speedups.enable()
         if bench:
             self.pr = Profile()
             self.pr.enable()           
@@ -90,6 +89,7 @@ class Calculus:
                             continue    
                         self.ownfields.append(poly.bbox())
                     shape_iter.next()
+            self.timer.update()
             layit.next()
                     
         self.timer.update()               
@@ -156,7 +156,7 @@ class Calculus:
             amount += len(trs)
         
             #for i in range(len(trs)):
-            #    cell.shapes(3).insert(trs[i])
+            #    cell.shapes(5).insert(trs[i])
         return shapes_fielded, amount
             
     
@@ -242,6 +242,8 @@ class Calculus:
         fields = sorted(shapes_with_f.keys(), key=lambda f: (f.bottom, f.left))
         fname = "field"
         for i,f in enumerate(fields):
+            if i % 20 == 0:
+                self.timer.update()
             fcon.write("PC" + fname + "_" + str(i + 1) + ";\n" + str((f.left + f.right) / 2 * self.dbu / 1000) + "," + \
             str((f.top + f.bottom) / 2 * self.dbu / 1000) + ";\n") 
             fcon.write("PP" + fname + "_" + str(i + 1) + ";\n" + str((f.left + f.right) / 2 * self.dbu / 1000) + "," + \
