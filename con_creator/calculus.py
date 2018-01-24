@@ -73,6 +73,7 @@ class Calculus:
         while not layit.at_end():
             lp = layit.current()
             info = ly.get_info(lp.layer_index())
+            print(info, lp.layer_index())
             if ((lp.visible and self.visible) or not self.visible) and lp.valid:
                 self.outlog.write(info, "\n")
                 shape_iter = ly.begin_shapes(cell, lp.layer_index())
@@ -110,10 +111,10 @@ class Calculus:
     def get_fields(self, shape):
         # returns field (pya.Box) where point is located
         
-        minimx = int(self.field.center[0] + self.field.size * ((shape.bbox().left - self.field.center[0]) // self.field.size + 0.5))
-        maximx = int(self.field.center[0] + self.field.size * ((shape.bbox().right - self.field.center[0]) // self.field.size + 0.5))
-        minimy = int(self.field.center[1] + self.field.size * ((shape.bbox().bottom - self.field.center[1]) // self.field.size + 0.5))
-        maximy = int(self.field.center[1] + self.field.size * ((shape.bbox().top - self.field.center[1]) // self.field.size + 0.5))
+        minimx = int(self.field.center[0] + self.field.size * ((shape.bbox().left - self.field.center[0] - 0.5 * self.field.size) // self.field.size + 0.5))
+        maximx = int(self.field.center[0] + self.field.size * ((shape.bbox().right - self.field.center[0] - 0.5 * self.field.size) // self.field.size + 0.5))
+        minimy = int(self.field.center[1] + self.field.size * ((shape.bbox().bottom - self.field.center[1] - 0.5 * self.field.size) // self.field.size + 0.5))
+        maximy = int(self.field.center[1] + self.field.size * ((shape.bbox().top - self.field.center[1] - 0.5 * self.field.size) // self.field.size + 0.5))
         fields = []
         for x in range(minimx, maximx + 1, self.field.size):
             for y in range(minimy, maximy + 1, self.field.size):
@@ -127,7 +128,7 @@ class Calculus:
         if self.field_layer == "":
             new_sections = []
             for shape in shapes:
-                sections.extend(self.get_fields(shape))    
+                sections.extend(self.get_fields(shape))
             for sec in sections:
                 if not sec in new_sections:
                     new_sections.append(sec)
@@ -155,8 +156,10 @@ class Calculus:
             shapes_fielded[field] = trs
             amount += len(trs)
         
-            #for i in range(len(trs)):
-            #    cell.shapes(5).insert(trs[i])
+            for i in range(len(trs)):
+                cell.shapes(9).insert(trs[i])
+        for i in sections:
+            cell.shapes(10).insert(i)
         return shapes_fielded, amount
             
     
