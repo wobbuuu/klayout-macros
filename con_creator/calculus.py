@@ -73,7 +73,7 @@ class Calculus:
         while not layit.at_end():
             lp = layit.current()
             info = ly.get_info(lp.layer_index())
-            print(info, lp.layer_index())
+            # print(info, lp.layer_index())
             if ((lp.visible and self.visible) or not self.visible) and lp.valid:
                 self.outlog.write(info, "\n")
                 shape_iter = ly.begin_shapes(cell, lp.layer_index())
@@ -156,10 +156,10 @@ class Calculus:
             shapes_fielded[field] = trs
             amount += len(trs)
         
-            for i in range(len(trs)):
-                cell.shapes(9).insert(trs[i])
-        for i in sections:
-            cell.shapes(10).insert(i)
+            #for i in range(len(trs)):
+            #    cell.shapes(9).insert(trs[i])
+        #for i in sections:
+        #    cell.shapes(10).insert(i)
         return shapes_fielded, amount
             
     
