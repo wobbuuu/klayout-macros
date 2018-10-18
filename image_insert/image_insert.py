@@ -3,7 +3,7 @@ import os
 import numpy as np 
 import pandas as pd
 
-dirname = "/home/wobbuuu/Cloud_mail.ru/Working Folder/Equipment PC/Brueker Multimode V8 (Skoltech)/10.01 SWCNT_29.05.2018_A_localization/export"
+dirname = "/home"
 
 df = pd.read_csv(os.path.join(dirname, "info.csv"), header=None)
 for i, row in df.iterrows():
