@@ -1,14 +1,14 @@
-<?xml version="1.0" encoding="utf-8"?>
+<?xml version='.0' encoding='utf-8'?>
 <klayout-macro>
- <description>Converter to CABL format</description>
- <version>0.1</version>
+ <description>Converter to CABL format with dose</description>
+ <version>0.1_v2</version>
  <category>pymacros</category>
  <prolog/>
  <epilog/>
  <doc/>
  <autorun>false</autorun>
  <autorun-early>false</autorun-early>
- <shortcut>Ctrl+I</shortcut>
+ <shortcut/>
  <show-in-menu>true</show-in-menu>
  <group-name/>
  <menu-path>file_menu.save_all</menu-path>
@@ -16,13 +16,15 @@
  <dsl-interpreter-name/>
  <text>import importlib
 import configparser
-from os.path import expanduser, dirname, realpath, join
+from pathlib import Path
 import pya
 
 from con_creator import calculus
 importlib.reload(calculus)
 from con_creator.calculus import Calculus
 
+curdir = Path(__file__).resolve().parent
+lastdir = curdir / '.lastdir'
 
 class OutLog:
     def __init__(self, edit, color=None):
@@ -50,17 +52,22 @@ class Field:
 class Gui:
     def __init__(self):
         # creation of form
-        ui_file = pya.QFile(join(dirname(realpath(__file__)), "dialog.ui"))
+        ui_file = pya.QFile(str(curdir / 'dialog.ui')) # does not support Path objects
         ui_file.open(pya.QIODevice.ReadOnly)
         self.form = pya.QFormBuilder().load(ui_file, pya.Application.instance().main_window())
         ui_file.close()
 
         # loading defaults
         config = configparser.ConfigParser()
-        config.read(join(dirname(realpath(__file__)), "defaults.ini"))
+        config.read(curdir / 'defaults.ini')
         
         # setting defaults
-        self.def_path = expanduser(config['General']['path'])
+        self.def_path = Path(config['General']['path']).expanduser()
+        self.uselastdir = config.getboolean('General', 'uselastdir')
+        if self.uselastdir and lastdir.exists():
+            with open(lastdir) as f:
+                self.def_path = f.readline()
+
         self.form.dose.value = float(config['General']['dose'])
         self.form.visible_flag.checked = config.getboolean('General', 'visible')
             
@@ -76,47 +83,52 @@ class Gui:
         self.form.mark2_y.value = float(config['Reg_marks']['reg_mark2_y'])
         
         # setting event handlers 
-        self.form.browse_button.clicked(self.__browse_button_clicked)
-        self.form.clear_button.clicked(self.__clear_button_clicked)
-        self.form.convert_button.clicked(self.__convert_button_clicked)
+        self.form.browse_button.clicked(self._browse_button_clicked)
+        self.form.clear_button.clicked(self._clear_button_clicked)
+        self.form.convert_button.clicked(self._convert_button_clicked)
         
         self.outlog = OutLog(self.form.textEdit)
         self.form.convert_button.setEnabled(False)
         self.form.pitch.setEnabled(False)
         #self.form.along_y_button.setEnabled(False)
-        
+        self.form.field_layer_box.clicked(self._toggle_center)
+
+
         self.form.exec_()
 
-    def set_elements(self, flag):
+    def set_elements(self, enable):
         '''
         Enabling/disabling all elements of form excluding 'clear' button
-        flag = True means enabling
         '''
-        self.form.filename_str.setEnabled(flag)
-        self.form.browse_button.setEnabled(flag)
-        self.form.field_groupbox.setEnabled(flag)
-        self.form.center_groupbox.setEnabled(flag)
-        self.form.reg_flag.setEnabled(flag)
-        self.form.visible_flag.setEnabled(flag)
+        self.form.filename_str.setEnabled(enable)
+        self.form.browse_button.setEnabled(enable)
+        self.form.field_groupbox.setEnabled(enable)
+        self.form.center_groupbox.setEnabled(enable)
+        self.form.reg_flag.setEnabled(enable)
+        self.form.visible_flag.setEnabled(enable)
         #self.form.along_x_button.setEnabled(flag)
         #self.form.along_y_button.setEnabled(flag)
-        self.form.dose.setEnabled(flag)
+        self.form.dose.setEnabled(enable)
         #self.form.pitch.setEnabled(flag)        
-        self.form.convert_button.setEnabled(flag)
-        self.form.field_layer_box.setEnabled(flag)
-    
-    def __clear_button_clicked(self, clicked):
+        self.form.convert_button.setEnabled(enable)
+        self.form.field_layer_box.setEnabled(enable)
+        self.form.merge_flag.setEnabled(enable)
+
+    def _toggle_center(self, clicked):
+        self.form.center_groupbox.setEnabled(not self.form.center_groupbox.enabled)
+
+    def _clear_button_clicked(self, clicked):
         self.form.textEdit.clear()
     
-    def __browse_button_clicked(self, clicked):
-        self.dirname = pya.QFileDialog.getExistingDirectory(self.form, "Open Directory", self.def_path)
-        if self.dirname != None:
+    def _browse_button_clicked(self, clicked):
+        self.dirname = pya.QFileDialog.getExistingDirectory(self.form, 'Open Directory', self.def_path)
+        if self.dirname is not None:
             self.form.filename_str.setText(self.dirname)
             self.form.convert_button.setEnabled(True)
             
-    def __convert_button_clicked(self, clicked):
-        if pya.Application.instance().main_window().current_view() == None:
-            self.outlog.write("Please open .gds file.\n")
+    def _convert_button_clicked(self, clicked):
+        if pya.Application.instance().main_window().current_view() is None:
+            self.outlog.write('Please open .gds file.\n')
             return
         # collecting parametrs of execution
         #if self.form.along_x_button.checked:
@@ -134,28 +146,33 @@ class Gui:
         visible = self.form.visible_flag.checked
         reg_marks = self.form.reg_flag.checked
         if reg_marks:
-            marks = [(self.form.mark1_x.value / 1000, self.form.mark1_y.value / 1000),\
-             (self.form.mark2_x.value / 1000, self.form.mark2_y.value / 1000)]
-            if marks[0][1] &gt; marks[1][1] or (marks[0][0] &gt; marks[1][0] and marks[0][1] == marks[1][1]):
+            marks = [(self.form.mark1_x.value / 1000, self.form.mark1_y.value / 1000),
+                     (self.form.mark2_x.value / 1000, self.form.mark2_y.value / 1000)]
+            if marks[0][1] > marks[1][1] or (marks[0][0] > marks[1][0] and marks[0][1] == marks[1][1]):
                 marks[0], marks[1] = marks[1], marks[0]
         else:
             marks = None
         
         self.set_elements(False)
 
-        self.outlog.write("Starting with following parameters:\nField: size = ", f_size, " um, dots = ", f_dots, " and center = ", f_center, " um.\n")
+        self.outlog.write('Starting with following parameters:\nField: size = ', f_size, ' um, dots = ', f_dots,
+                          ' and center = ', f_center, ' um.\n')
         if reg_marks:
-            self.outlog.write("Registration marks: ", marks, " mm.\n")
+            self.outlog.write('Registration marks: ', marks, ' mm.\n')
         else:
-            self.outlog.write("No registration marks.\n")
+            self.outlog.write('No registration marks.\n')
         if self.form.field_layer_box.checked:
             field_layer = self.form.field_layer.text
         else:
-            field_layer = ""
+            field_layer = ''
         merge = self.form.merge_flag.checked
         self.worker = Calculus(dirname, field, marks, visible, direction, pitch, dose, self.outlog, field_layer, merge)
         self.worker.start()
         self.set_elements(True)
+
+        if self.uselastdir:
+            with open(lastdir, 'w') as f:
+                f.write(str(Path(dirname).resolve().parent))
 
 
 gui_window = Gui()
