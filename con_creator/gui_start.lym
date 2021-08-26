@@ -62,7 +62,7 @@ class Gui:
         config.read(curdir / 'defaults.ini')
         
         # setting defaults
-        self.def_path = Path(config['General']['path']).expanduser()
+        self.def_path = str(Path(config['General']['path']).expanduser())
         self.uselastdir = config.getboolean('General', 'uselastdir')
         if self.uselastdir and lastdir.exists():
             with open(lastdir) as f:

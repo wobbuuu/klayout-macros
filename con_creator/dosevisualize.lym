@@ -99,13 +99,13 @@ class DoseVisualizer(pya.QDialog):
                 self.cell.shapes(layer_id).insert(poly)
 
         # Create layers for each dose and place there corresponding shapes
-        for i, dose in enumerate(sorted(doses)):
+        for i, dose in enumerate(sorted(doses, key=lambda x: float(x))):
             linfo = pya.LayerInfo(self.dose_layer, i + 1, 'doses')
             layer_id = self.ly.insert_layer(linfo)
 
             color = self.rgb2int(255, int(255 * (len(doses) - i) / len(doses)), 0)
             ln = pya.LayerPropertiesNode()
-            ln.dither_pattern = 2
+            ln.dither_pattern = 0
             ln.width = 1
             ln.fill_color = color
             ln.frame_color = self.rgb2int(0, 0, 0)
