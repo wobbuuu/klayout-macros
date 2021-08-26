@@ -93,7 +93,6 @@ class Gui:
         #self.form.along_y_button.setEnabled(False)
         self.form.field_layer_box.clicked(self._toggle_center)
 
-
         self.form.exec_()
 
     def set_elements(self, enable):
@@ -103,7 +102,7 @@ class Gui:
         self.form.filename_str.setEnabled(enable)
         self.form.browse_button.setEnabled(enable)
         self.form.field_groupbox.setEnabled(enable)
-        self.form.center_groupbox.setEnabled(enable)
+        self.form.center_groupbox.setEnabled(enable and not self.form.field_layer_box.checked)
         self.form.reg_flag.setEnabled(enable)
         self.form.visible_flag.setEnabled(enable)
         #self.form.along_x_button.setEnabled(flag)
@@ -115,7 +114,7 @@ class Gui:
         self.form.merge_flag.setEnabled(enable)
 
     def _toggle_center(self, clicked):
-        self.form.center_groupbox.setEnabled(not self.form.center_groupbox.enabled)
+        self.form.center_groupbox.setEnabled(not clicked)#self.form.center_groupbox.checked)
 
     def _clear_button_clicked(self, clicked):
         self.form.textEdit.clear()
