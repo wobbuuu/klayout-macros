@@ -1,14 +1,14 @@
-<?xml version='.0' encoding='utf-8'?>
+<?xml version="1.0" encoding="utf-8"?>
 <klayout-macro>
- <description>Converter to CABL format with dose</description>
- <version>0.1_v2</version>
+ <description>Converter to CABL format</description>
+ <version>0.2</version>
  <category>pymacros</category>
  <prolog/>
  <epilog/>
  <doc/>
  <autorun>false</autorun>
  <autorun-early>false</autorun-early>
- <shortcut/>
+ <shortcut>Ctrl+I</shortcut>
  <show-in-menu>true</show-in-menu>
  <group-name/>
  <menu-path>file_menu.save_all</menu-path>
@@ -148,7 +148,7 @@ class Gui:
         if reg_marks:
             marks = [(self.form.mark1_x.value / 1000, self.form.mark1_y.value / 1000),
                      (self.form.mark2_x.value / 1000, self.form.mark2_y.value / 1000)]
-            if marks[0][1] > marks[1][1] or (marks[0][0] > marks[1][0] and marks[0][1] == marks[1][1]):
+            if marks[0][1] &gt; marks[1][1] or (marks[0][0] &gt; marks[1][0] and marks[0][1] == marks[1][1]):
                 marks[0], marks[1] = marks[1], marks[0]
         else:
             marks = None
