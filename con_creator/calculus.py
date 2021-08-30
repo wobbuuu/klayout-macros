@@ -161,6 +161,8 @@ class Calculus:
                     shapes_fielded[sec][i][1].extend(
                         pya.EdgeProcessor().boolean_p2p([shape], [sec], pya.EdgeProcessor.ModeAnd, True, True))
             shapes_fielded[sec] = [[dose, polys] for dose, polys in shapes_fielded[sec] if polys != []]
+            if not shapes_fielded[sec]:
+                shapes_fielded.pop(sec, None)
 
         # Secondly new shapes are divided into trapezoids, parallelograms and triangles
         amount = 0
