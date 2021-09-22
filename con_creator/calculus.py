@@ -372,7 +372,7 @@ class Calculus:
             fpat.write('D ' + fname + str(i) + '\n')
             for dose, shapes in shapes_with_f[f]:
                 for shape in shapes:
-                    string = self.get_str_bin(shape, f, dose)
+                    string = self.get_str_pat(shape, f, dose)
                     if string is not None:
                         fpat.write(string + '\n')
             fpat.write('END\n\n')
