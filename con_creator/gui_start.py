@@ -85,7 +85,7 @@ class Gui:
             self.form.field_dots.setEnabled(False)
             self.form.label_dots.setEnabled(False)
         self.form.field_layer_box.clicked(self._toggle_center)
-
+        self.form.setStyleSheet("QWidget {font-size: 11pt; font-family: Arial,Helvetica,sans-serif}")
         self.form.exec_()
 
     def set_elements(self, enable):
