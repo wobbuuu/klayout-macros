@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<klayout-macro>
+ <description>Converter to Xenos format</description>
+ <version>0.2</version>
+ <category>pymacros</category>
+ <prolog/>
+ <epilog/>
+ <doc/>
+ <autorun>false</autorun>
+ <autorun-early>false</autorun-early>
+ <shortcut>Alt+I</shortcut>
+ <show-in-menu>true</show-in-menu>
+ <group-name/>
+ <menu-path>file_menu.save_all</menu-path>
+ <interpreter>python</interpreter>
+ <dsl-interpreter-name/>
+ <text>import importlib
+import configparser
+from pathlib import Path
+import pya
+
+from con_creator import gui_start
+importlib.reload(gui_start)
+from con_creator.gui_start import Gui
+
+gui_window = Gui(ebl='xenos')
+
+</text>
+</klayout-macro>

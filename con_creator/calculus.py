@@ -30,7 +30,8 @@ class Timer:
 
 
 class Calculus:
-    def __init__(self, dirname, field, marks, visible, direction, pitch, dose, outlog, field_layer, merge, bench=False):
+    def __init__(self, ebl, dirname, field, marks, visible, direction, pitch, dose, outlog, field_layer, merge, bench=False):
+        self.ebl = ebl
         self.dirname = dirname
         self.field = field
         self.marks = marks
@@ -108,7 +109,10 @@ class Calculus:
         self.outlog.write('There were ', len(polygons), ' polygons. Now there are ', amount,
                           ' polygons in ', len(shapes_with_f.keys()), ' fields.\n')
         self.timer.update()
-        self.write_files(shapes_with_f)
+        if self.ebl == 'cabl':
+            self.write_files(shapes_with_f)
+        elif self.ebl == 'xenos':
+            self.write_pat_ctl(shapes_with_f)
         self.outlog.write(str(self.timer))
         self.outlog.write('End of writing files.\n')
 
@@ -292,3 +296,86 @@ class Calculus:
             fcbc.close()
         fcon.write('!END\n')
         fcon.close()
+
+    def get_str_pat(self, shape, field, dose):
+        coef = self.field.dots / self.field.size
+        points = []
+        for p in shape.each_point():
+            xcord = int((p.x - field.left) * coef)
+            ycord = int((p.y - field.bottom) * coef)
+            points.append((xcord, ycord))
+        points.append(points[0])
+        area = self.signed_area(points)
+        if len(points) < 4:
+            self.outlog.write('Polygon collapsed due to amount of points. Points: [',
+                              ', '.join('(%.3f, %.3f)' % (v.x * self.dbu, v.y * self.dbu) for v in
+                                        shape.each_point()) + ']\n')
+            return None
+        elif area == 0:
+            self.outlog.write('Polygon collapsed due to zero area. Points: [',
+                              ', '.join('(%.3f, %.3f)' % (v.x * self.dbu, v.y * self.dbu) for v in
+                                        shape.each_point()) + ']\n')
+            return None
+        min_index, min_value = min(enumerate(points), key=lambda p: (p[1][1], p[1][0]))
+
+        points = points[min_index:] + points[1:min_index + 1]
+
+        if area < 0:
+            points = points[::-1]  # reverse
+
+        if (points[0][0] == points[1][0]) and (points[1][1] == points[2][1]) and \
+                (points[2][0] == points[3][0]) and (points[3][1] == points[0][1]):
+            outstr = 'RECT ' + \
+                     str(points[0][0]) + ', ' + str(points[0][1]) + ', ' + \
+                     str(points[2][0]) + ', ' + str(points[2][1])
+        elif len(points) == 5:
+            outstr = 'XPOLY ' + \
+                     str(points[0][0]) + ', ' + str(points[0][1]) + ', ' + \
+                     str(points[3][0]) + ', ' + str(points[2][0]) + ', ' + \
+                     str(points[1][0]) + ', ' + str(points[1][1])
+        else:
+            outstr = 'XPOLY ' + \
+                     str(points[0][0]) + ', ' + str(points[0][1]) + ', ' + \
+                     str(points[2][0]) + ', ' + str(points[1][0]) + ', ' + \
+                     str(points[1][0]) + ', ' + str(points[1][1])
+        outstr = 'C ' + str(round(dose * 20) * 50) + '\nI ' + str(self.pitch) + '\n' + outstr
+        return outstr
+
+    def write_pat_ctl(self, shapes_with_f):
+        for item in listdir(self.dirname):
+            path = join(self.dirname, item)
+            if isfile(path):
+                end = split(item)[-1].lower()
+                if len(end) > 3:
+                    if end[-3:] == 'pat' or end[-3:] == 'ctl':
+                        remove(path)
+        filename = split(self.dirname)[1]
+        fctl = open(join(self.dirname, filename + '.ctl'), 'w')
+        fpat = open(join(self.dirname, filename + '.pat'), 'w')
+        head = 'origin = 0, 0\ncurrent = 100\n' \
+               'fsize = ' + str(round(self.field.size * self.dbu)) + '\n' \
+                                                                     'sfile = ' + filename + '\n\n'
+        fctl.write(head)
+        # if self.marks is not None:
+        #     fctl.write('R2 ' + str(self.marks[0][0]) + ',' + str(self.marks[0][1]) + '; ' +
+        #                str(self.marks[1][0]) + ',' + str(self.marks[1][1]) + ';\n')
+        fields = sorted(shapes_with_f.keys(), key=lambda f: (f.bottom, f.left))
+        fname = 'field'
+        for i, f in enumerate(fields):
+            if i % 20 == 0:
+                self.timer.update()
+            a = str(round((f.left + f.right) / 2 * self.dbu, 3))
+            b = str(round((f.top + f.bottom) / 2 * self.dbu, 3))
+            move = 'x = ' + str(round((f.left + f.right) / 2 * self.dbu, 3)) + '\ny = ' + \
+                   str(round((f.top + f.bottom) / 2 * self.dbu, 3)) + '\nstage\n'
+            fctl.write(move + 'draw(' + fname + str(i) + ')\n\n')
+            fpat.write('D ' + fname + str(i) + '\n')
+            for dose, shapes in shapes_with_f[f]:
+                for shape in shapes:
+                    string = self.get_str_bin(shape, f, dose)
+                    if string is not None:
+                        fpat.write(string + '\n')
+            fpat.write('END\n\n')
+        fpat.close()
+        fctl.write('end\n')
+        fctl.close()
