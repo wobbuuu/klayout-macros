@@ -356,9 +356,11 @@ class Calculus:
                'fsize = ' + str(round(self.field.size * self.dbu)) + '\n' \
                                                                      'sfile = ' + filename + '\n\n'
         fctl.write(head)
-        # if self.marks is not None:
-        #     fctl.write('R2 ' + str(self.marks[0][0]) + ',' + str(self.marks[0][1]) + '; ' +
-        #                str(self.marks[1][0]) + ',' + str(self.marks[1][1]) + ';\n')
+        if self.marks is not None:
+            fctl.write('gmfile = \n\n')
+            for mark in self.marks:
+                fctl.write('gmcoord = ' + str(mark[0]*1000) + ', ' + str(mark[1]*1000) + '\n')
+            fctl.write('\ngmark (MANUAL)\ngmark (MANUAL)\n\n')
         fields = sorted(shapes_with_f.keys(), key=lambda f: (f.bottom, f.left))
         fname = 'field'
         for i, f in enumerate(fields):

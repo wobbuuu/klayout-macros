@@ -1,7 +1,10 @@
+import importlib
 import configparser
 from pathlib import Path
 import pya
 
+from con_creator import calculus
+importlib.reload(calculus)
 from con_creator.calculus import Calculus
 
 curdir = Path(__file__).resolve().parent
