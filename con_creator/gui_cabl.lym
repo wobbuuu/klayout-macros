@@ -19,11 +19,14 @@ import configparser
 from pathlib import Path
 import pya
 
-from con_creator import gui_start
-importlib.reload(gui_start)
-from con_creator.gui_start import Gui
+from con_creator import gui
+importlib.reload(gui)
+from con_creator.gui import ConverterDialog
 
-gui_window = Gui(ebl='cabl')
+# Instantiate the dialog and make it visible initially.
+# Passing the main_window will make it stay on top of the main window.
+dialog = ConverterDialog(pya.Application.instance().main_window(), ebl='cabl')
+dialog.show()
 
 </text>
 </klayout-macro>

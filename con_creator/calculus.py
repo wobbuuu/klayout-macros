@@ -26,7 +26,7 @@ class Timer:
 
     def __str__(self):
         self.current = time()
-        return '------------------------------- %.1f seconds -----------------------------\n' % (self.current - self.start)
+        return '---------------------------- %.1f seconds ----------------------------\n' % (self.current - self.start)
 
 
 class Calculus:
