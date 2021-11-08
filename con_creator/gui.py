@@ -48,7 +48,10 @@ class ConverterDialog(pya.QDialog):
         config.read(curdir / ('defaults_' + ebl + '.ini'))
         self.ebl = ebl
 
-        self.setWindowTitle("Create .ctl and .pat files")
+        if self.ebl == 'cabl':
+            self.setWindowTitle("Create .con and binary files")
+        elif self.ebl == 'xenos':
+            self.setWindowTitle("Create .ctl and .pat files")
         # self.resize(540, 650)
 
         vbox = pya.QVBoxLayout()

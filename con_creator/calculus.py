@@ -320,24 +320,26 @@ class Calculus:
 
         points = points[min_index:] + points[1:min_index + 1]
 
-        if area < 0:
-            points = points[::-1]  # reverse
+        if area > 0:
+            points = points[::-1]  # reverse to make counterclockwise
 
-        if (points[0][0] == points[1][0]) and (points[1][1] == points[2][1]) and \
-                (points[2][0] == points[3][0]) and (points[3][1] == points[0][1]):
+        if len(points) == 4:
+            if points[0][1] == points[1][1]:
+                points[-1] = points[-2]
+            else:
+                points[2:] = points[1:3]
+                points[1] = points[0]
+
+        if (points[0][0] == points[3][0]) and (points[0][1] == points[1][1]) and \
+                (points[1][0] == points[2][0]) and (points[2][1] == points[3][1]):
             outstr = 'RECT ' + \
                      str(points[0][0]) + ', ' + str(points[0][1]) + ', ' + \
                      str(points[2][0]) + ', ' + str(points[2][1])
-        elif len(points) == 5:
-            outstr = 'XPOLY ' + \
-                     str(points[0][0]) + ', ' + str(points[0][1]) + ', ' + \
-                     str(points[3][0]) + ', ' + str(points[2][0]) + ', ' + \
-                     str(points[1][0]) + ', ' + str(points[1][1])
         else:
             outstr = 'XPOLY ' + \
                      str(points[0][0]) + ', ' + str(points[0][1]) + ', ' + \
-                     str(points[2][0]) + ', ' + str(points[1][0]) + ', ' + \
-                     str(points[1][0]) + ', ' + str(points[1][1])
+                     str(points[1][0]) + ', ' + str(points[2][0]) + ', ' + \
+                     str(points[3][0]) + ', ' + str(points[2][1])
         outstr = 'C ' + str(round(dose * 20) * 50) + '\nI ' + str(self.pitch) + '\n' + outstr
         return outstr
 
